@@ -1,208 +1,159 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Space Car Sniper – Fixed</title>
+<meta charset="UTF-8">
+<title>Space Car Sniper – Ready</title>
 <script src="https://cdn.tailwindcss.com"></script>
-
 <style>
-  body { margin: 0; overflow: hidden; background: black; }
-  .game {
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
+    perspective: 900px;
+    perspective-origin: center 70%;
+  }
+  .scene {
     position: relative;
     width: 100vw;
     height: 100vh;
-    background:
-      radial-gradient(circle at 50% 120%, #020617, #000),
-      repeating-linear-gradient(
-        90deg,
-        rgba(255,255,255,0.04) 0 2px,
-        transparent 2px 80px
-      );
+    transform-style: preserve-3d;
+    background: radial-gradient(circle at 50% 120%, #020617, #000);
+  }
+  .deck {
+    position: absolute;
+    bottom: -200px;
+    width: 200%;
+    height: 600px;
+    background: repeating-linear-gradient(
+      90deg,
+      rgba(255,255,255,0.05) 0 2px,
+      transparent 2px 120px
+    );
+    transform: translateX(-25%) rotateX(65deg) translateZ(-200px);
   }
   .entity {
     position: absolute;
+    transform-style: preserve-3d;
     will-change: transform;
-    z-index: 10;
   }
-  .player { z-index: 20; }
-  .enemy { z-index: 15; }
-  .boss { z-index: 18; }
+  .glow { filter: drop-shadow(0 0 14px currentColor); }
   .laser {
     background: linear-gradient(#fecaca, #ef4444);
-    box-shadow: 0 0 12px #f87171;
-    z-index: 25;
+    box-shadow: 0 0 16px #f87171;
   }
 </style>
 </head>
-
 <body>
-<div id="game" class="game"></div>
-
+<div class="scene" id="scene">
+  <div class="deck"></div>
+</div>
 <script>
-const game = document.getElementById("game");
+const scene = document.getElementById("scene");
 const W = () => window.innerWidth;
 const H = () => window.innerHeight;
-
-const keys = {};
 let frame = 0;
 let kills = 0;
 
-/* ================= PLAYER ================= */
-const player = {
-  x: window.innerWidth / 2 - 60,
-  y: window.innerHeight - 140,
-  speed: 9,
-  el: createCar()
-};
-player.el.classList.add("player");
-game.appendChild(player.el);
-
-function createCar() {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", 120);
-  svg.setAttribute("height", 60);
-  svg.classList.add("entity");
-  svg.innerHTML = `
-    <defs>
-      <linearGradient id="carBody" x1="0" x2="1">
-        <stop offset="0%" stop-color="#22d3ee"/>
-        <stop offset="100%" stop-color="#0ea5e9"/>
-      </linearGradient>
-    </defs>
-    <rect x="20" y="18" width="80" height="22" rx="10" fill="url(#carBody)"/>
-    <rect x="45" y="10" width="30" height="12" rx="6" fill="#67e8f9"/>
-    <circle cx="35" cy="45" r="6" fill="#020617"/>
-    <circle cx="85" cy="45" r="6" fill="#020617"/>
-  `;
-  return svg;
-}
-
-/* ================= INPUT ================= */
-addEventListener("keydown", e => keys[e.key] = true);
-addEventListener("keyup", e => keys[e.key] = false);
+/* INPUT */
+const keys = {};
+addEventListener("keydown", e=>keys[e.key]=true);
+addEventListener("keyup", e=>keys[e.key]=false);
 addEventListener("click", shoot);
 
-/* ================= BULLETS ================= */
-const bullets = [];
-function shoot() {
-  const b = document.createElement("div");
-  b.className = "entity laser";
-  b.style.width = "4px";
-  b.style.height = "28px";
-  b.x = player.x + 58;
-  b.y = player.y;
-  bullets.push(b);
-  game.appendChild(b);
-}
-
-/* ================= ENEMIES ================= */
-const enemies = [];
-
-function spawnEnemy(type) {
-  const e = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  e.setAttribute("width", 70);
-  e.setAttribute("height", 70);
-  e.classList.add("entity", "enemy");
-
-  e.type = type;
-  e.hp = type === 3 ? 6 : type === 2 ? 3 : 1;
-
-  e.x = Math.random() * (W() - 70);
-  e.y = -80;
-
-  e.innerHTML =
-    type === 1 ? `
-      <circle cx="35" cy="35" r="22" fill="#a855f7"/>
-      <circle cx="35" cy="35" r="10" fill="#e9d5ff"/>
-    ` :
-    type === 2 ? `
-      <polygon points="35,5 65,60 5,60" fill="#facc15"/>
-      <circle cx="35" cy="35" r="6" fill="#854d0e"/>
-    ` :
-    `
-      <rect x="10" y="10" width="50" height="50" rx="14" fill="#ef4444"/>
-      <circle cx="35" cy="35" r="12" fill="#fecaca"/>
-    `;
-
-  enemies.push(e);
-  game.appendChild(e);
-}
-
-/* ================= BOSS ================= */
-let boss = null;
-function spawnBoss() {
-  boss = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  boss.setAttribute("width", 260);
-  boss.setAttribute("height", 140);
-  boss.classList.add("entity", "boss");
-
-  boss.x = W() / 2 - 130;
-  boss.y = 40;
-  boss.hp = 60;
-
-  boss.innerHTML = `
-    <rect x="0" y="20" width="260" height="80" rx="30" fill="#7c2d12"/>
-    <circle cx="130" cy="60" r="34" fill="#fde047"/>
-    <circle cx="130" cy="60" r="16" fill="#92400e"/>
+/* PLAYER */
+const player = {
+  x: W()/2-60, y:H()-180, z:40, speed:10, el:createCar3D()
+};
+scene.appendChild(player.el);
+function createCar3D() {
+  const car=document.createElement("div");
+  car.className="entity glow";
+  car.style.width="120px"; car.style.height="60px";
+  car.innerHTML=`
+    <div style="position:absolute;inset:0;background:linear-gradient(90deg,#22d3ee,#0ea5e9);border-radius:14px;transform:translateZ(20px);"></div>
+    <div style="position:absolute;inset:6px;background:#67e8f9;border-radius:10px;transform:translateZ(36px);"></div>
+    <div style="position:absolute;inset:0;background:#020617;border-radius:14px;transform:translateZ(0);opacity:.35;"></div>
   `;
-  game.appendChild(boss);
+  return car;
 }
 
-/* ================= GAME LOOP ================= */
-function update() {
+/* BULLETS */
+const bullets=[];
+function shoot(){
+  const b=document.createElement("div");
+  b.className="entity laser";
+  b.style.width="4px"; b.style.height="40px";
+  b.x=player.x+58; b.y=player.y; b.z=player.z+40;
+  bullets.push(b); scene.appendChild(b);
+}
+
+/* ENEMIES */
+const enemies=[];
+function spawnEnemy(type){
+  const e=document.createElement("div");
+  e.className="entity glow"; e.style.width="70px"; e.style.height="70px";
+  e.type=type; e.hp=type===3?6:type===2?3:1;
+  e.x=Math.random()*(W()-100); e.y=-140; e.z=-400-Math.random()*200;
+  e.style.borderRadius="18px";
+  e.style.background=type===1?"radial-gradient(#e9d5ff,#a855f7)":type===2?"conic-gradient(#facc15,#854d0e)":"radial-gradient(#fecaca,#ef4444)";
+  enemies.push(e); scene.appendChild(e);
+}
+
+/* BOSS */
+let boss=null;
+function spawnBoss(){
+  boss=document.createElement("div");
+  boss.className="entity glow";
+  boss.style.width="260px"; boss.style.height="140px";
+  boss.x=W()/2-130; boss.y=60; boss.z=-600; boss.hp=40;
+  boss.style.background="radial-gradient(circle at center,#fde047,#92400e)";
+  boss.style.borderRadius="40px";
+  scene.appendChild(boss);
+}
+
+/* GAME LOOP */
+function update(){
   frame++;
-
-  // Player
-  if (keys.ArrowLeft) player.x -= player.speed;
-  if (keys.ArrowRight) player.x += player.speed;
-  player.x = Math.max(0, Math.min(W() - 120, player.x));
-  player.el.style.transform =
-    `translate(${player.x}px, ${player.y + Math.sin(frame/10)*2}px)`;
-
-  // Bullets
-  bullets.forEach((b, i) => {
-    b.y -= 18;
-    b.style.transform = `translate(${b.x}px, ${b.y}px)`;
-    if (b.y < -40) {
-      b.remove();
-      bullets.splice(i,1);
-    }
+  /* Player */
+  if(keys.ArrowLeft) player.x-=player.speed;
+  if(keys.ArrowRight) player.x+=player.speed;
+  player.x=Math.max(0,Math.min(W()-120,player.x));
+  player.el.style.transform=`translate3d(${player.x}px,${player.y}px,${player.z}px) rotateX(8deg) rotateZ(${Math.sin(frame/20)*1.5}deg)`;
+  
+  /* Bullets */
+  bullets.forEach((b,bi)=>{
+    b.y-=22; b.z+=14;
+    b.style.transform=`translate3d(${b.x}px,${b.y}px,${b.z}px)`;
+    if(b.y<-120){b.remove(); bullets.splice(bi,1);}
   });
-
-  // Enemies
-  enemies.forEach((e, i) => {
-    e.y += 2 + e.type;
-    e.x += Math.sin(frame/20 + i) * e.type;
-    e.style.transform = `translate(${e.x}px, ${e.y}px)`;
-
-    bullets.forEach((b, bi) => {
-      if (
-        b.x > e.x && b.x < e.x + 70 &&
-        b.y > e.y && b.y < e.y + 70
-      ) {
-        e.hp--;
-        b.remove();
-        bullets.splice(bi,1);
-        if (e.hp <= 0) {
-          e.remove();
-          enemies.splice(i,1);
-          kills++;
-        }
+  
+  /* Enemies */
+  enemies.forEach((e,ei)=>{
+    e.y+=3+e.type; e.z+=10;
+    e.style.transform=`translate3d(${e.x}px,${e.y}px,${e.z}px) rotateX(12deg)`;
+    bullets.forEach((b,bi)=>{
+      if(Math.abs(b.x-e.x)<60 && Math.abs(b.y-e.y)<60 && Math.abs(b.z-e.z)<80){
+        e.hp--; b.remove(); bullets.splice(bi,1);
+        if(e.hp<=0){e.remove(); enemies.splice(ei,1); kills++;}
       }
     });
   });
-
-  // Boss
-  if (kills >= 15 && !boss) spawnBoss();
-  if (boss) {
-    boss.x += Math.sin(frame/40) * 2;
-    boss.style.transform = `translate(${boss.x}px, ${boss.y}px)`;
+  
+  /* Boss */
+  if(kills>=15 && !boss) spawnBoss();
+  if(boss){
+    boss.z+=4; boss.x+=Math.sin(frame/40)*3;
+    boss.style.transform=`translate3d(${boss.x}px,${boss.y}px,${boss.z}px)`;
+    bullets.forEach((b,bi)=>{
+      if(Math.abs(b.x-boss.x)<140 && Math.abs(b.y-boss.y)<80 && Math.abs(b.z-boss.z)<120){
+        boss.hp--; b.remove(); bullets.splice(bi,1);
+        if(boss.hp<=0){boss.remove(); boss=null;}
+      }
+    });
   }
 
-  // 🔥 GUARANTEED SPAWNER
-  if (frame % 45 === 0 && enemies.length < 6 && !boss) {
-    spawnEnemy(1 + Math.floor(Math.random() * 3));
-  }
+  /* Spawn enemies */
+  if(frame%50===0 && enemies.length<6 && !boss) spawnEnemy(1+Math.floor(Math.random()*3));
 
   requestAnimationFrame(update);
 }
