@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Space Car Sniper</title>
+<title>Space Car Sniper – Fixed</title>
 <script src="https://cdn.tailwindcss.com"></script>
 
 <style>
@@ -22,13 +22,15 @@
   .entity {
     position: absolute;
     will-change: transform;
+    z-index: 10;
   }
-  .glow {
-    filter: drop-shadow(0 0 12px currentColor);
-  }
+  .player { z-index: 20; }
+  .enemy { z-index: 15; }
+  .boss { z-index: 18; }
   .laser {
     background: linear-gradient(#fecaca, #ef4444);
     box-shadow: 0 0 12px #f87171;
+    z-index: 25;
   }
 </style>
 </head>
@@ -38,17 +40,21 @@
 
 <script>
 const game = document.getElementById("game");
-const W = innerWidth, H = innerHeight;
+const W = () => window.innerWidth;
+const H = () => window.innerHeight;
+
 const keys = {};
-let frame = 0, kills = 0;
+let frame = 0;
+let kills = 0;
 
 /* ================= PLAYER ================= */
 const player = {
-  x: W / 2,
-  y: H - 140,
+  x: window.innerWidth / 2 - 60,
+  y: window.innerHeight - 140,
   speed: 9,
   el: createCar()
 };
+player.el.classList.add("player");
 game.appendChild(player.el);
 
 function createCar() {
@@ -56,7 +62,6 @@ function createCar() {
   svg.setAttribute("width", 120);
   svg.setAttribute("height", 60);
   svg.classList.add("entity");
-
   svg.innerHTML = `
     <defs>
       <linearGradient id="carBody" x1="0" x2="1">
@@ -68,8 +73,6 @@ function createCar() {
     <rect x="45" y="10" width="30" height="12" rx="6" fill="#67e8f9"/>
     <circle cx="35" cy="45" r="6" fill="#020617"/>
     <circle cx="85" cy="45" r="6" fill="#020617"/>
-    <rect x="0" y="26" width="14" height="8" rx="4" fill="#38bdf8"/>
-    <rect x="106" y="26" width="14" height="8" rx="4" fill="#38bdf8"/>
   `;
   return svg;
 }
@@ -85,9 +88,9 @@ function shoot() {
   const b = document.createElement("div");
   b.className = "entity laser";
   b.style.width = "4px";
-  b.style.height = "30px";
+  b.style.height = "28px";
   b.x = player.x + 58;
-  b.y = player.y - 20;
+  b.y = player.y;
   bullets.push(b);
   game.appendChild(b);
 }
@@ -99,10 +102,12 @@ function spawnEnemy(type) {
   const e = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   e.setAttribute("width", 70);
   e.setAttribute("height", 70);
-  e.classList.add("entity", "glow");
+  e.classList.add("entity", "enemy");
+
   e.type = type;
   e.hp = type === 3 ? 6 : type === 2 ? 3 : 1;
-  e.x = Math.random() * (W - 70);
+
+  e.x = Math.random() * (W() - 70);
   e.y = -80;
 
   e.innerHTML =
@@ -129,8 +134,9 @@ function spawnBoss() {
   boss = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   boss.setAttribute("width", 260);
   boss.setAttribute("height", 140);
-  boss.classList.add("entity", "glow");
-  boss.x = W / 2 - 130;
+  boss.classList.add("entity", "boss");
+
+  boss.x = W() / 2 - 130;
   boss.y = 40;
   boss.hp = 60;
 
@@ -139,7 +145,6 @@ function spawnBoss() {
     <circle cx="130" cy="60" r="34" fill="#fde047"/>
     <circle cx="130" cy="60" r="16" fill="#92400e"/>
   `;
-
   game.appendChild(boss);
 }
 
@@ -147,18 +152,24 @@ function spawnBoss() {
 function update() {
   frame++;
 
+  // Player
   if (keys.ArrowLeft) player.x -= player.speed;
   if (keys.ArrowRight) player.x += player.speed;
-  player.x = Math.max(0, Math.min(W - 120, player.x));
+  player.x = Math.max(0, Math.min(W() - 120, player.x));
   player.el.style.transform =
     `translate(${player.x}px, ${player.y + Math.sin(frame/10)*2}px)`;
 
+  // Bullets
   bullets.forEach((b, i) => {
     b.y -= 18;
     b.style.transform = `translate(${b.x}px, ${b.y}px)`;
-    if (b.y < 0) { b.remove(); bullets.splice(i,1); }
+    if (b.y < -40) {
+      b.remove();
+      bullets.splice(i,1);
+    }
   });
 
+  // Enemies
   enemies.forEach((e, i) => {
     e.y += 2 + e.type;
     e.x += Math.sin(frame/20 + i) * e.type;
@@ -166,8 +177,8 @@ function update() {
 
     bullets.forEach((b, bi) => {
       if (
-        b.x > e.x && b.x < e.x+70 &&
-        b.y > e.y && b.y < e.y+70
+        b.x > e.x && b.x < e.x + 70 &&
+        b.y > e.y && b.y < e.y + 70
       ) {
         e.hp--;
         b.remove();
@@ -181,14 +192,17 @@ function update() {
     });
   });
 
-  if (kills > 15 && !boss) spawnBoss();
+  // Boss
+  if (kills >= 15 && !boss) spawnBoss();
   if (boss) {
     boss.x += Math.sin(frame/40) * 2;
     boss.style.transform = `translate(${boss.x}px, ${boss.y}px)`;
   }
 
-  if (frame % 50 === 0 && kills < 15)
-    spawnEnemy(1 + Math.floor(Math.random()*3));
+  // 🔥 GUARANTEED SPAWNER
+  if (frame % 45 === 0 && enemies.length < 6 && !boss) {
+    spawnEnemy(1 + Math.floor(Math.random() * 3));
+  }
 
   requestAnimationFrame(update);
 }
