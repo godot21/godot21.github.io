@@ -1,163 +1,222 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Space Car Sniper – Ready</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8" />
+<title>Maze Shooter (Three.js)</title>
 <style>
-  body {
-    margin: 0;
-    overflow: hidden;
-    background: black;
-    perspective: 900px;
-    perspective-origin: center 70%;
-  }
-  .scene {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-    transform-style: preserve-3d;
-    background: radial-gradient(circle at 50% 120%, #020617, #000);
-  }
-  .deck {
-    position: absolute;
-    bottom: -200px;
-    width: 200%;
-    height: 600px;
-    background: repeating-linear-gradient(
-      90deg,
-      rgba(255,255,255,0.05) 0 2px,
-      transparent 2px 120px
-    );
-    transform: translateX(-25%) rotateX(65deg) translateZ(-200px);
-  }
-  .entity {
-    position: absolute;
-    transform-style: preserve-3d;
-    will-change: transform;
-  }
-  .glow { filter: drop-shadow(0 0 14px currentColor); }
-  .laser {
-    background: linear-gradient(#fecaca, #ef4444);
-    box-shadow: 0 0 16px #f87171;
-  }
+  body { margin: 0; overflow: hidden; background: #020617; }
+  canvas { display: block; }
 </style>
 </head>
 <body>
-<div class="scene" id="scene">
-  <div class="deck"></div>
-</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
-const scene = document.getElementById("scene");
-const W = () => window.innerWidth;
-const H = () => window.innerHeight;
-let frame = 0;
-let kills = 0;
+/* =======================
+   BASIC SETUP
+======================= */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x020617);
 
-/* INPUT */
+const camera = new THREE.OrthographicCamera(
+  window.innerWidth / -2,
+  window.innerWidth / 2,
+  window.innerHeight / 2,
+  window.innerHeight / -2,
+  0.1,
+  1000
+);
+camera.position.z = 10;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+/* =======================
+   MAZE
+======================= */
+const TILE = 80;
+const maze = [
+  "##########",
+  "#........#",
+  "#.####...#",
+  "#....#...#",
+  "###..#.###.",
+  "#....#...#",
+  "#.######.#",
+  "#........#",
+  "##########"
+];
+
+const walls = [];
+const wallMat = new THREE.MeshBasicMaterial({ color: 0x334155 });
+
+maze.forEach((row, y) => {
+  [...row].forEach((cell, x) => {
+    if (cell === "#") {
+      const wall = new THREE.Mesh(
+        new THREE.BoxGeometry(TILE, TILE, 1),
+        wallMat
+      );
+      wall.position.set(
+        x * TILE - (maze[0].length * TILE) / 2,
+        -y * TILE + (maze.length * TILE) / 2,
+        0
+      );
+      scene.add(wall);
+      walls.push(wall);
+    }
+  });
+});
+
+/* =======================
+   PLAYER
+======================= */
+const player = new THREE.Mesh(
+  new THREE.CircleGeometry(25, 24),
+  new THREE.MeshBasicMaterial({ color: 0x22d3ee })
+);
+player.position.set(-300, 300, 0);
+scene.add(player);
+
 const keys = {};
-addEventListener("keydown", e=>keys[e.key]=true);
-addEventListener("keyup", e=>keys[e.key]=false);
-addEventListener("click", shoot);
+addEventListener("keydown", e => keys[e.key] = true);
+addEventListener("keyup", e => keys[e.key] = false);
 
-/* PLAYER */
-const player = {
-  x: W()/2-60, y:H()-180, z:40, speed:10, el:createCar3D()
-};
-scene.appendChild(player.el);
-function createCar3D() {
-  const car=document.createElement("div");
-  car.className="entity glow";
-  car.style.width="120px"; car.style.height="60px";
-  car.innerHTML=`
-    <div style="position:absolute;inset:0;background:linear-gradient(90deg,#22d3ee,#0ea5e9);border-radius:14px;transform:translateZ(20px);"></div>
-    <div style="position:absolute;inset:6px;background:#67e8f9;border-radius:10px;transform:translateZ(36px);"></div>
-    <div style="position:absolute;inset:0;background:#020617;border-radius:14px;transform:translateZ(0);opacity:.35;"></div>
-  `;
-  return car;
+/* =======================
+   BULLETS
+======================= */
+const bullets = [];
+
+addEventListener("click", e => {
+  const bullet = new THREE.Mesh(
+    new THREE.CircleGeometry(6, 12),
+    new THREE.MeshBasicMaterial({ color: 0xf87171 })
+  );
+  bullet.position.copy(player.position);
+
+  const dir = new THREE.Vector2(
+    e.clientX - window.innerWidth / 2,
+    -(e.clientY - window.innerHeight / 2)
+  ).normalize();
+
+  bullet.velocity = dir.multiplyScalar(14);
+  bullets.push(bullet);
+  scene.add(bullet);
+});
+
+/* =======================
+   ENEMIES
+======================= */
+const enemies = [];
+
+function spawnEnemy(x, y) {
+  const enemy = new THREE.Mesh(
+    new THREE.BoxGeometry(40, 40, 1),
+    new THREE.MeshBasicMaterial({ color: 0xef4444 })
+  );
+  enemy.position.set(x, y, 0);
+  enemy.hp = 3;
+  enemies.push(enemy);
+  scene.add(enemy);
 }
 
-/* BULLETS */
-const bullets=[];
-function shoot(){
-  const b=document.createElement("div");
-  b.className="entity laser";
-  b.style.width="4px"; b.style.height="40px";
-  b.x=player.x+58; b.y=player.y; b.z=player.z+40;
-  bullets.push(b); scene.appendChild(b);
+/* =======================
+   CONTINUOUS SPAWNER (FIX)
+======================= */
+let spawnTimer = 0;
+const MAX_ENEMIES = 6;
+
+/* =======================
+   COLLISION
+======================= */
+function collides(a, b, sizeA = 30, sizeB = 40) {
+  return (
+    Math.abs(a.position.x - b.position.x) < sizeA + sizeB &&
+    Math.abs(a.position.y - b.position.y) < sizeA + sizeB
+  );
 }
 
-/* ENEMIES */
-const enemies=[];
-function spawnEnemy(type){
-  const e=document.createElement("div");
-  e.className="entity glow"; e.style.width="70px"; e.style.height="70px";
-  e.type=type; e.hp=type===3?6:type===2?3:1;
-  e.x=Math.random()*(W()-100); e.y=-140; e.z=-400-Math.random()*200;
-  e.style.borderRadius="18px";
-  e.style.background=type===1?"radial-gradient(#e9d5ff,#a855f7)":type===2?"conic-gradient(#facc15,#854d0e)":"radial-gradient(#fecaca,#ef4444)";
-  enemies.push(e); scene.appendChild(e);
-}
+/* =======================
+   GAME LOOP
+======================= */
+function animate() {
+  requestAnimationFrame(animate);
 
-/* BOSS */
-let boss=null;
-function spawnBoss(){
-  boss=document.createElement("div");
-  boss.className="entity glow";
-  boss.style.width="260px"; boss.style.height="140px";
-  boss.x=W()/2-130; boss.y=60; boss.z=-600; boss.hp=40;
-  boss.style.background="radial-gradient(circle at center,#fde047,#92400e)";
-  boss.style.borderRadius="40px";
-  scene.appendChild(boss);
-}
+  /* PLAYER MOVE */
+  const speed = 6;
+  if (keys["ArrowUp"] || keys["w"]) player.position.y += speed;
+  if (keys["ArrowDown"] || keys["s"]) player.position.y -= speed;
+  if (keys["ArrowLeft"] || keys["a"]) player.position.x -= speed;
+  if (keys["ArrowRight"] || keys["d"]) player.position.x += speed;
 
-/* GAME LOOP */
-function update(){
-  frame++;
-  /* Player */
-  if(keys.ArrowLeft) player.x-=player.speed;
-  if(keys.ArrowRight) player.x+=player.speed;
-  player.x=Math.max(0,Math.min(W()-120,player.x));
-  player.el.style.transform=`translate3d(${player.x}px,${player.y}px,${player.z}px) rotateX(8deg) rotateZ(${Math.sin(frame/20)*1.5}deg)`;
-  
-  /* Bullets */
-  bullets.forEach((b,bi)=>{
-    b.y-=22; b.z+=14;
-    b.style.transform=`translate3d(${b.x}px,${b.y}px,${b.z}px)`;
-    if(b.y<-120){b.remove(); bullets.splice(bi,1);}
-  });
-  
-  /* Enemies */
-  enemies.forEach((e,ei)=>{
-    e.y+=3+e.type; e.z+=10;
-    e.style.transform=`translate3d(${e.x}px,${e.y}px,${e.z}px) rotateX(12deg)`;
-    bullets.forEach((b,bi)=>{
-      if(Math.abs(b.x-e.x)<60 && Math.abs(b.y-e.y)<60 && Math.abs(b.z-e.z)<80){
-        e.hp--; b.remove(); bullets.splice(bi,1);
-        if(e.hp<=0){e.remove(); enemies.splice(ei,1); kills++;}
+  /* BULLETS */
+  bullets.forEach((b, i) => {
+    b.position.x += b.velocity.x;
+    b.position.y += b.velocity.y;
+
+    enemies.forEach((e, ei) => {
+      if (collides(b, e)) {
+        e.hp--;
+        scene.remove(b);
+        bullets.splice(i, 1);
+
+        if (e.hp <= 0) {
+          scene.remove(e);
+          enemies.splice(ei, 1);
+        }
       }
     });
   });
-  
-  /* Boss */
-  if(kills>=15 && !boss) spawnBoss();
-  if(boss){
-    boss.z+=4; boss.x+=Math.sin(frame/40)*3;
-    boss.style.transform=`translate3d(${boss.x}px,${boss.y}px,${boss.z}px)`;
-    bullets.forEach((b,bi)=>{
-      if(Math.abs(b.x-boss.x)<140 && Math.abs(b.y-boss.y)<80 && Math.abs(b.z-boss.z)<120){
-        boss.hp--; b.remove(); bullets.splice(bi,1);
-        if(boss.hp<=0){boss.remove(); boss=null;}
+
+  /* ENEMIES MOVE */
+  enemies.forEach(e => {
+    const dir = new THREE.Vector2(
+      player.position.x - e.position.x,
+      player.position.y - e.position.y
+    ).normalize();
+
+    e.position.x += dir.x * 2;
+    e.position.y += dir.y * 2;
+  });
+
+  /* ENEMY SPAWNING (FIXED) */
+  spawnTimer++;
+  if (spawnTimer > 120 && enemies.length < MAX_ENEMIES) {
+    spawnTimer = 0;
+
+    let x, y;
+    while (true) {
+      const tx = Math.floor(Math.random() * maze[0].length);
+      const ty = Math.floor(Math.random() * maze.length);
+
+      if (maze[ty][tx] === ".") {
+        x = tx * TILE - (maze[0].length * TILE) / 2;
+        y = -ty * TILE + (maze.length * TILE) / 2;
+        break;
       }
-    });
+    }
+
+    spawnEnemy(x, y);
   }
 
-  /* Spawn enemies */
-  if(frame%50===0 && enemies.length<6 && !boss) spawnEnemy(1+Math.floor(Math.random()*3));
-
-  requestAnimationFrame(update);
+  renderer.render(scene, camera);
 }
-update();
+
+animate();
+
+/* =======================
+   RESIZE
+======================= */
+addEventListener("resize", () => {
+  camera.left = window.innerWidth / -2;
+  camera.right = window.innerWidth / 2;
+  camera.top = window.innerHeight / 2;
+  camera.bottom = window.innerHeight / -2;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 </script>
+
 </body>
 </html>
