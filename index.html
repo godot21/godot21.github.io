@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,9 +16,17 @@
 /* =======================
    BASIC SETUP
 ======================= */
+/**
+ * @type {THREE.Scene}
+ * @description The scene where all objects will be rendered.
+ */
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020617);
 
+/**
+ * @type {THREE.OrthographicCamera}
+ * @description The camera used to view the scene.  Orthographic camera is used for 2D games.
+ */
 const camera = new THREE.OrthographicCamera(
   window.innerWidth / -2,
   window.innerWidth / 2,
@@ -28,6 +37,10 @@ const camera = new THREE.OrthographicCamera(
 );
 camera.position.z = 10;
 
+/**
+ * @type {THREE.WebGLRenderer}
+ * @description The renderer responsible for drawing the scene.
+ */
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -35,7 +48,13 @@ document.body.appendChild(renderer.domElement);
 /* =======================
    MAZE
 ======================= */
+/**
+ * @constant {number} TILE - The size of each tile in the maze.
+ */
 const TILE = 80;
+/**
+ * @constant {string[]} maze - A 2D array representing the maze layout.  '#' represents walls, '.' represents open spaces.
+ */
 const maze = [
   "##########",
   "#........#",
@@ -48,7 +67,13 @@ const maze = [
   "##########"
 ];
 
+/**
+ * @type {THREE.Mesh[]} walls - An array to store the wall meshes.
+ */
 const walls = [];
+/**
+ * @type {THREE.MeshBasicMaterial} wallMat - The material used for the walls.
+ */
 const wallMat = new THREE.MeshBasicMaterial({ color: 0x334155 });
 
 maze.forEach((row, y) => {
@@ -72,6 +97,9 @@ maze.forEach((row, y) => {
 /* =======================
    PLAYER
 ======================= */
+/**
+ * @type {THREE.Mesh} player - The player's character.
+ */
 const player = new THREE.Mesh(
   new THREE.CircleGeometry(25, 24),
   new THREE.MeshBasicMaterial({ color: 0x22d3ee })
@@ -79,6 +107,9 @@ const player = new THREE.Mesh(
 player.position.set(-300, 300, 0);
 scene.add(player);
 
+/**
+ * @type {object} keys - An object to track which keys are pressed.
+ */
 const keys = {};
 addEventListener("keydown", e => keys[e.key] = true);
 addEventListener("keyup", e => keys[e.key] = false);
@@ -86,6 +117,9 @@ addEventListener("keyup", e => keys[e.key] = false);
 /* =======================
    BULLETS
 ======================= */
+/**
+ * @type {THREE.Mesh[]} bullets - An array to store the bullet meshes.
+ */
 const bullets = [];
 
 addEventListener("click", e => {
@@ -108,8 +142,17 @@ addEventListener("click", e => {
 /* =======================
    ENEMIES
 ======================= */
+/**
+ * @type {THREE.Mesh[]} enemies - An array to store the enemy meshes.
+ */
 const enemies = [];
 
+/**
+ * @function spawnEnemy
+ * @param {number} x - The x-coordinate to spawn the enemy.
+ * @param {number} y - The y-coordinate to spawn the enemy.
+ * @description Spawns a new enemy at the specified coordinates.
+ */
 function spawnEnemy(x, y) {
   const enemy = new THREE.Mesh(
     new THREE.BoxGeometry(40, 40, 1),
@@ -124,12 +167,27 @@ function spawnEnemy(x, y) {
 /* =======================
    CONTINUOUS SPAWNER (FIX)
 ======================= */
+/**
+ * @type {number} spawnTimer - A timer to control enemy spawning.
+ */
 let spawnTimer = 0;
+/**
+ * @constant {number} MAX_ENEMIES - The maximum number of enemies allowed on the screen.
+ */
 const MAX_ENEMIES = 6;
 
 /* =======================
    COLLISION
 ======================= */
+/**
+ * @function collides
+ * @param {THREE.Mesh} a - The first object.
+ * @param {THREE.Mesh} b - The second object.
+ * @param {number} [sizeA=30] - The size of the first object.
+ * @param {number} [sizeB=40] - The size of the second object.
+ * @returns {boolean} - True if the objects collide, false otherwise.
+ * @description Checks if two objects are colliding.
+ */
 function collides(a, b, sizeA = 30, sizeB = 40) {
   return (
     Math.abs(a.position.x - b.position.x) < sizeA + sizeB &&
@@ -140,6 +198,10 @@ function collides(a, b, sizeA = 30, sizeB = 40) {
 /* =======================
    GAME LOOP
 ======================= */
+/**
+ * @function animate
+ * @description The main animation loop.
+ */
 function animate() {
   requestAnimationFrame(animate);
 
@@ -208,6 +270,10 @@ animate();
 /* =======================
    RESIZE
 ======================= */
+/**
+ * @function resize
+ * @description Handles the window resize event.
+ */
 addEventListener("resize", () => {
   camera.left = window.innerWidth / -2;
   camera.right = window.innerWidth / 2;
@@ -220,3 +286,4 @@ addEventListener("resize", () => {
 
 </body>
 </html>
+```
