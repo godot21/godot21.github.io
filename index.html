@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Space Car Sniper – Ready</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
+    perspective: 900px;
+    perspective-origin: center 70%;
+  }
+  .scene {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    transform-style: preserve-3d;
+    background: radial-gradient(circle at 50% 120%, #020617, #000);
+  }
+  .deck {
+    position: absolute;
+    bottom: -200px;
+    width: 200%;
+    height: 600px;
+    background: repeating-linear-gradient(
+      90deg,
+      rgba(255,255,255,0.05) 0 2px,
+      transparent 2px 120px
+    );
+    transform: translateX(-25%) rotateX(65deg) translateZ(-200px);
+  }
+  .entity {
+    position: absolute;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+  .glow { filter: drop-shadow(0 0 14px currentColor); }
+  .laser {
+    background: linear-gradient(#fecaca, #ef4444);
+    box-shadow: 0 0 16px #f87171;
+  }
+</style>
+</head>
+<body>
+<div class="scene" id="scene">
+  <div class="deck"></div>
+</div>
+<script>
+const scene = document.getElementById("scene");
+const W = () => window.innerWidth;
+const H = () => window.innerHeight;
+let frame = 0;
+let kills = 0;
+
+/* INPUT */
+const keys = {};
+addEventListener("keydown", e=>keys[e.key]=true);
+addEventListener("keyup", e=>keys[e.key]=false);
+addEventListener("click", shoot);
+
+/* PLAYER */
+const player = {
+  x: W()/2-60, y:H()-180, z:40, speed:10, el:createCar3D()
+};
+scene.appendChild(player.el);
+function createCar3D() {
+  const car=document.createElement("div");
+  car.className="entity glow";
+  car.style.width="120px"; car.style.height="60px";
+  car.innerHTML=`
+    <div style="position:absolute;inset:0;background:linear-gradient(90deg,#22d3ee,#0ea5e9);border-radius:14px;transform:translateZ(20px);"></div>
+    <div style="position:absolute;inset:6px;background:#67e8f9;border-radius:10px;transform:translateZ(36px);"></div>
+    <div style="position:absolute;inset:0;background:#020617;border-radius:14px;transform:translateZ(0);opacity:.35;"></div>
+  `;
+  return car;
+}
+
+/* BULLETS */
+const bullets=[];
+function shoot(){
+  const b=document.createElement("div");
+  b.className="entity laser";
+  b.style.width="4px"; b.style.height="40px";
+  b.x=player.x+58; b.y=player.y; b.z=player.z+40;
+  bullets.push(b); scene.appendChild(b);
+}
+
+/* ENEMIES */
+const enemies=[];
+function spawnEnemy(type){
+  const e=document.createElement("div");
+  e.className="entity glow"; e.style.width="70px"; e.style.height="70px";
+  e.type=type; e.hp=type===3?6:type===2?3:1;
+  e.x=Math.random()*(W()-100); e.y=-140; e.z=-400-Math.random()*200;
+  e.style.borderRadius="18px";
+  e.style.background=type===1?"radial-gradient(#e9d5ff,#a855f7)":type===2?"conic-gradient(#facc15,#854d0e)":"radial-gradient(#fecaca,#ef4444)";
+  enemies.push(e); scene.appendChild(e);
+}
+
+/* BOSS */
+let boss=null;
+function spawnBoss(){
+  boss=document.createElement("div");
+  boss.className="entity glow";
+  boss.style.width="260px"; boss.style.height="140px";
+  boss.x=W()/2-130; boss.y=60; boss.z=-600; boss.hp=40;
+  boss.style.background="radial-gradient(circle at center,#fde047,#92400e)";
+  boss.style.borderRadius="40px";
+  scene.appendChild(boss);
+}
+
+/* GAME LOOP */
+function update(){
+  frame++;
+  /* Player */
+  if(keys.ArrowLeft) player.x-=player.speed;
+  if(keys.ArrowRight) player.x+=player.speed;
+  player.x=Math.max(0,Math.min(W()-120,player.x));
+  player.el.style.transform=`translate3d(${player.x}px,${player.y}px,${player.z}px) rotateX(8deg) rotateZ(${Math.sin(frame/20)*1.5}deg)`;
+  
+  /* Bullets */
+  bullets.forEach((b,bi)=>{
+    b.y-=22; b.z+=14;
+    b.style.transform=`translate3d(${b.x}px,${b.y}px,${b.z}px)`;
+    if(b.y<-120){b.remove(); bullets.splice(bi,1);}
+  });
+  
+  /* Enemies */
+  enemies.forEach((e,ei)=>{
+    e.y+=3+e.type; e.z+=10;
+    e.style.transform=`translate3d(${e.x}px,${e.y}px,${e.z}px) rotateX(12deg)`;
+    bullets.forEach((b,bi)=>{
+      if(Math.abs(b.x-e.x)<60 && Math.abs(b.y-e.y)<60 && Math.abs(b.z-e.z)<80){
+        e.hp--; b.remove(); bullets.splice(bi,1);
+        if(e.hp<=0){e.remove(); enemies.splice(ei,1); kills++;}
+      }
+    });
+  });
+  
+  /* Boss */
+  if(kills>=15 && !boss) spawnBoss();
+  if(boss){
+    boss.z+=4; boss.x+=Math.sin(frame/40)*3;
+    boss.style.transform=`translate3d(${boss.x}px,${boss.y}px,${boss.z}px)`;
+    bullets.forEach((b,bi)=>{
+      if(Math.abs(b.x-boss.x)<140 && Math.abs(b.y-boss.y)<80 && Math.abs(b.z-boss.z)<120){
+        boss.hp--; b.remove(); bullets.splice(bi,1);
+        if(boss.hp<=0){boss.remove(); boss=null;}
+      }
+    });
+  }
+
+  /* Spawn enemies */
+  if(frame%50===0 && enemies.length<6 && !boss) spawnEnemy(1+Math.floor(Math.random()*3));
+
+  requestAnimationFrame(update);
+}
+update();
+</script>
+</body>
+</html>
