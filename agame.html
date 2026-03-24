@@ -1,1 +1,116 @@
 
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Find the Egyptian Peasant</title>
+  <style>
+    body { font-family: Arial; text-align: center; background: #111; color: white; }
+    img { width: 400px; cursor: crosshair; border: 3px solid white; }
+    #questionBox { display: none; margin-top: 20px; }
+    button { padding: 10px; margin: 5px; }
+  </style>
+</head>
+<body>
+
+<h1>Find the Egyptian Peasant</h1>
+<p>Click the hidden peasant!</p>
+<p>Score: <span id="score">0</span></p>
+
+<img id="gameImage" src="" onclick="checkClick(event)">
+
+<div id="questionBox">
+  <p id="questionText"></p>
+  <div id="answers"></div>
+</div>
+
+<script>
+let score = 0;
+
+// Fake "images" + hidden coordinates (percent based)
+const images = [
+  { src: "https://picsum.photos/400?random=1", x: 0.3, y: 0.6 },
+  { src: "https://picsum.photos/400?random=2", x: 0.7, y: 0.4 },
+  { src: "https://picsum.photos/400?random=3", x: 0.5, y: 0.2 }
+];
+
+const questions = [
+  {
+    q: "What river was central to ancient Egypt?",
+    a: ["Nile", "Amazon", "Mississippi"],
+    correct: 0
+  },
+  {
+    q: "Who ruled ancient Egypt?",
+    a: ["Pharaoh", "King Arthur", "Emperor"],
+    correct: 0
+  },
+  {
+    q: "What did Egyptians write on?",
+    a: ["Papyrus", "Paper", "Stone tablets"],
+    correct: 0
+  }
+];
+
+let currentImage;
+let currentQuestion;
+
+function loadImage() {
+  currentImage = images[Math.floor(Math.random() * images.length)];
+  document.getElementById("gameImage").src = currentImage.src;
+  document.getElementById("questionBox").style.display = "none";
+}
+
+function checkClick(e) {
+  const rect = e.target.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+
+  // tolerance area
+  if (Math.abs(x - currentImage.x) < 0.1 && Math.abs(y - currentImage.y) < 0.1) {
+    score += 1;
+    updateScore();
+    showQuestion();
+  } else {
+    alert("Wrong spot! New image.");
+    loadImage();
+  }
+}
+
+function showQuestion() {
+  currentQuestion = questions[Math.floor(Math.random() * questions.length)];
+  document.getElementById("questionText").innerText = currentQuestion.q;
+
+  const answersDiv = document.getElementById("answers");
+  answersDiv.innerHTML = "";
+
+  currentQuestion.a.forEach((ans, i) => {
+    const btn = document.createElement("button");
+    btn.innerText = ans;
+    btn.onclick = () => checkAnswer(i);
+    answersDiv.appendChild(btn);
+  });
+
+  document.getElementById("questionBox").style.display = "block";
+}
+
+function checkAnswer(i) {
+  if (i === currentQuestion.correct) {
+    score += 2;
+    alert("Correct!");
+  } else {
+    alert("Wrong! New image.");
+  }
+  updateScore();
+  loadImage();
+}
+
+function updateScore() {
+  document.getElementById("score").innerText = score;
+}
+
+// start game
+loadImage();
+</script>
+
+</body>
+</html>
